@@ -1,8 +1,27 @@
-const { BigNumber, ethers, providers, Wallet } = require("ethers");
-const { FlashbotsBundleProvider, FlashbotsBundleResolution } = require("@flashbots/ethers-provider-bundle");
-const dotenv = require("dotenv");
-const { v4: uuidv4 } = require("uuid");
+import { BigNumber, ethers, providers, Wallet } from "ethers";
+import { FlashbotsBundleProvider, FlashbotsBundleResolution } from "@flashbots/ethers-provider-bundle";
+import * as dotenv from "dotenv";
+import { v4 as uuidv4 } from "uuid";
 dotenv.config();
+
+const enum DEXS {
+  UNISWAP = "uniswap",
+  DODO = "dodo",
+  CURVE = "curve",
+  MAVERICK = "maverick",
+  THORCHAIN = "thorchain",
+  BALANCER = "balancer",
+  PANCAKESWAP = "pancakeswap",
+}
+
+interface LegacyTransaction {
+  to: string;
+  gasPrice: BigNumber;
+  gasLimit: number;
+  data: any;
+  nonce?: any;
+  chainId: number;
+}
 
 const FLASHBOTS_AUTH_KEY = process.env.FLASHBOTS_AUTH_KEY;
 
@@ -11,46 +30,50 @@ const PRIORITY_FEE = GWEI.mul(3);
 const LEGACY_GAS_PRICE = GWEI.mul(12);
 const BLOCKS_IN_THE_FUTURE = 2;
 
-const RouterABI = [
+const UniswapRouterABI = [
   "function getAmountsOut(uint amountIn, address[] memory path) public view returns (uint[] memory amounts)",
   "function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)",
 ];
-const FactoryABI = ["event PairCreated(address indexed token0, address indexed token1, address pair, uint)"];
+const UniswapFactoryABI = ["event PairCreated(address indexed token0, address indexed token1, address pair, uint)"];
 
 const WETH = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
 const WETH_GOERLI = "0xb4fbf271143f4fbf7b91a5ded31805e42b2208d6";
 
 const addresses = {
   WETH: process.env.IS_PRODUCTION === "true" ? WETH : WETH_GOERLI,
-  factory: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
-  router: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
-  recipient: process.env.RECIPIENT_ADDRESS,
+  UNISWAPFACTORY: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
+  UNISWAPROUTER: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+  SUSHISWAPFACTORY: "",
+  SUSHISWAPROUTER: "",
+  RECIPIENT: process.env.RECIPIENT_ADDRESS,
 };
 
 // Define token address desired to buy
-const token0 = process.env.TOKEN_ADDRESS;
-const token1 = addresses.WETH;
+const token0: string = process.env.TOKEN_ADDRESS || "";
+const token1: string = addresses.WETH;
 
-const CHAIN_ID = process.env.IS_PRODUCTION === "true" ? 1 : 5;
-const provider = new providers.WebSocketProvider(CHAIN_ID === 1 ? process.env.NODE_WSS : process.env.NODE_WSS_GOERLI);
-const FLASHBOTS_EP = CHAIN_ID === 1 ? "https://relay.flashbots.net/" : "https://relay-goerli.flashbots.net/";
+async function order(dex: string, token0?: string, token1?: string, amount?: string | number) {
+  const CHAIN_ID = process.env.IS_PRODUCTION === "true" ? 1 : 5;
+  const provider = new providers.WebSocketProvider(
+    CHAIN_ID === 1 ? process.env.NODE_WSS || "" : process.env.NODE_WSS_GOERLI || ""
+  );
+  const FLASHBOTS_EP = CHAIN_ID === 1 ? "https://relay.flashbots.net/" : "https://relay-goerli.flashbots.net/";
 
-for (const e of ["FLASHBOTS_AUTH_KEY", "PRIVATE_KEY", "TOKEN_ADDRESS"]) {
-  if (!process.env[e]) {
-    console.warn(`${e} should be defined as an environment variable`);
+  for (const e of ["FLASHBOTS_AUTH_KEY", "PRIVATE_KEY", "TOKEN_ADDRESS"]) {
+    if (!process.env[e]) {
+      console.warn(`${e} should be defined as an environment variable`);
+    }
   }
-}
 
-async function main() {
   const authSigner = FLASHBOTS_AUTH_KEY ? new Wallet(FLASHBOTS_AUTH_KEY) : Wallet.createRandom();
   const wallet = new Wallet(process.env.PRIVATE_KEY || "", provider);
   const flashbotsProvider = await FlashbotsBundleProvider.create(provider, authSigner, FLASHBOTS_EP);
 
   const connectedWallet = wallet.connect(provider);
-  const routerInterface = new ethers.utils.Interface(RouterABI);
+  const routerInterface = new ethers.utils.Interface(UniswapRouterABI);
 
-  const factory = new ethers.Contract(addresses.factory, FactoryABI, connectedWallet);
-  const router = new ethers.Contract(addresses.router, RouterABI, connectedWallet);
+  const factory = new ethers.Contract(addresses.UNISWAPFACTORY, UniswapFactoryABI, connectedWallet);
+  const router = new ethers.Contract(addresses.UNISWAPROUTER, UniswapRouterABI, connectedWallet);
 
   let tokenIn, tokenOut;
   if (token0 === addresses.WETH) {
@@ -76,7 +99,7 @@ async function main() {
     tokenOut: ${amountOutMin.toString()} ${tokenOut}
   `);
 
-  const params = [amountIn, amountOutMin, [tokenIn, tokenOut], addresses.recipient, Date.now() + 1000 * 60 * 10];
+  const params = [amountIn, amountOutMin, [tokenIn, tokenOut], addresses.RECIPIENT, Date.now() + 1000 * 60 * 10];
 
   const userStats = flashbotsProvider.getUserStats();
   if (process.env.TEST_V2) {
@@ -88,8 +111,8 @@ async function main() {
     }
   }
 
-  const legacyTransaction = {
-    to: addresses.router,
+  const legacyTransaction: LegacyTransaction = {
+    to: addresses.UNISWAPROUTER,
     gasPrice: LEGACY_GAS_PRICE,
     gasLimit: 500000,
     data: routerInterface.encodeFunctionData("swapExactTokensForTokens", params),
@@ -113,7 +136,7 @@ async function main() {
         BLOCKS_IN_THE_FUTURE
       );
       eip1559Transaction = {
-        to: addresses.router,
+        to: addresses.UNISWAPROUTER,
         type: 2,
         maxFeePerGas: PRIORITY_FEE.add(maxBaseFeeInFutureBlock),
         maxPriorityFeePerGas: PRIORITY_FEE,
@@ -173,4 +196,4 @@ async function main() {
   });
 }
 
-main();
+order("uniswap", process.env.TOKEN_ADDRESS, token1, 0.03);

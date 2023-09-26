@@ -34,7 +34,6 @@ const UniswapRouterABI = [
   "function getAmountsOut(uint amountIn, address[] memory path) public view returns (uint[] memory amounts)",
   "function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)",
 ];
-const UniswapFactoryABI = ["event PairCreated(address indexed token0, address indexed token1, address pair, uint)"];
 
 const WETH = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
 const WETH_GOERLI = "0xb4fbf271143f4fbf7b91a5ded31805e42b2208d6";
@@ -43,15 +42,18 @@ const addresses = {
   WETH: process.env.IS_PRODUCTION === "true" ? WETH : WETH_GOERLI,
   UNISWAPFACTORY: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
   UNISWAPROUTER: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
-  SUSHISWAPFACTORY: "",
-  SUSHISWAPROUTER: "",
+  PANCAKESWAPFACTORY: "",
+  PANCAKESWAPROUTER: "0xEfF92A263d31888d860bD50809A8D171709b7b1c",
   RECIPIENT: process.env.RECIPIENT_ADDRESS,
 };
 
-// Define token address desired to buy
-const token0: string = process.env.TOKEN_ADDRESS || "";
-const token1: string = addresses.WETH;
-
+/**
+ * Execute orders on multiple dexs
+ * @param dex the dex's name you wish run your order on
+ * @param token0 token address desired to buy
+ * @param token1 token address spent on order
+ * @param amount token1 amount to execute an order
+ */
 async function order(dex: string, token0?: string, token1?: string, amount?: string | number) {
   const CHAIN_ID = process.env.IS_PRODUCTION === "true" ? 1 : 5;
   const provider = new providers.WebSocketProvider(
@@ -65,15 +67,24 @@ async function order(dex: string, token0?: string, token1?: string, amount?: str
     }
   }
 
+  let routerAddress: string, routerABI: string[];
+  if (dex !== DEXS.PANCAKESWAP) {
+    routerAddress = addresses.UNISWAPROUTER;
+    routerABI = UniswapRouterABI;
+  } else {
+    routerAddress = addresses.PANCAKESWAPROUTER;
+    routerABI = UniswapRouterABI;
+  }
+
   const authSigner = FLASHBOTS_AUTH_KEY ? new Wallet(FLASHBOTS_AUTH_KEY) : Wallet.createRandom();
   const wallet = new Wallet(process.env.PRIVATE_KEY || "", provider);
   const flashbotsProvider = await FlashbotsBundleProvider.create(provider, authSigner, FLASHBOTS_EP);
 
   const connectedWallet = wallet.connect(provider);
-  const routerInterface = new ethers.utils.Interface(UniswapRouterABI);
+  const routerInterface = new ethers.utils.Interface(routerABI);
 
-  const factory = new ethers.Contract(addresses.UNISWAPFACTORY, UniswapFactoryABI, connectedWallet);
-  const router = new ethers.Contract(addresses.UNISWAPROUTER, UniswapRouterABI, connectedWallet);
+  // const factory = new ethers.Contract(addresses.UNISWAPFACTORY, UniswapFactoryABI, connectedWallet);
+  const router = new ethers.Contract(routerAddress, routerABI, connectedWallet);
 
   let tokenIn, tokenOut;
   if (token0 === addresses.WETH) {
@@ -89,7 +100,7 @@ async function order(dex: string, token0?: string, token1?: string, amount?: str
   if (typeof tokenIn === "undefined") {
     return;
   }
-  const amountIn = ethers.utils.parseUnits(process.env.AMOUNT_IN || "0.001", "ether");
+  const amountIn = ethers.utils.parseUnits(amount?.toString() || process.env.AMOUNT_IN || "0.001", "ether");
   const amounts = await router.getAmountsOut(amountIn, [tokenIn, tokenOut]);
   const amountOutMin = amounts[1].sub(amounts[1].div(10));
   console.log(`
@@ -112,7 +123,7 @@ async function order(dex: string, token0?: string, token1?: string, amount?: str
   }
 
   const legacyTransaction: LegacyTransaction = {
-    to: addresses.UNISWAPROUTER,
+    to: routerAddress,
     gasPrice: LEGACY_GAS_PRICE,
     gasLimit: 500000,
     data: routerInterface.encodeFunctionData("swapExactTokensForTokens", params),
@@ -136,7 +147,7 @@ async function order(dex: string, token0?: string, token1?: string, amount?: str
         BLOCKS_IN_THE_FUTURE
       );
       eip1559Transaction = {
-        to: addresses.UNISWAPROUTER,
+        to: routerAddress,
         type: 2,
         maxFeePerGas: PRIORITY_FEE.add(maxBaseFeeInFutureBlock),
         maxPriorityFeePerGas: PRIORITY_FEE,
@@ -196,4 +207,4 @@ async function order(dex: string, token0?: string, token1?: string, amount?: str
   });
 }
 
-order("uniswap", process.env.TOKEN_ADDRESS, token1, 0.03);
+order("uniswap", process.env.TOKEN_ADDRESS, addresses.WETH, 0.001);

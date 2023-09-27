@@ -158,10 +158,10 @@ async function order(dex: string, token0?: string, token1?: string, amount?: str
     }
 
     const signedTransactions = await flashbotsProvider.signBundle([
-      {
-        signer: wallet,
-        transaction: legacyTransaction,
-      },
+      // {
+      //   signer: wallet,
+      //   transaction: legacyTransaction,
+      // },
       {
         signer: wallet,
         transaction: eip1559Transaction,
@@ -186,8 +186,8 @@ async function order(dex: string, token0?: string, token1?: string, amount?: str
       throw new Error(bundleSubmission.error.message);
     }
 
-    const cancelResult = await flashbotsProvider.cancelBundles(replacementUuid);
-    console.log("cancel response", cancelResult);
+    // const cancelResult = await flashbotsProvider.cancelBundles(replacementUuid);
+    // console.log("cancel response", cancelResult);
 
     const waitResponse = await bundleSubmission.wait();
     console.log(`Wait Response: ${FlashbotsBundleResolution[waitResponse]}`);

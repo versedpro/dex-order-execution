@@ -2,33 +2,16 @@ import { BigNumber, ethers, providers, Wallet } from "ethers";
 import { FlashbotsBundleProvider, FlashbotsBundleResolution } from "@flashbots/ethers-provider-bundle";
 import * as dotenv from "dotenv";
 import { v4 as uuidv4 } from "uuid";
+import { DEXS, LegacyTransaction } from "./type";
+import execute from "./flashloan";
 dotenv.config();
-
-const enum DEXS {
-  UNISWAP = "uniswap",
-  DODO = "dodo",
-  CURVE = "curve",
-  MAVERICK = "maverick",
-  THORCHAIN = "thorchain",
-  BALANCER = "balancer",
-  PANCAKESWAP = "pancakeswap",
-}
-
-interface LegacyTransaction {
-  to: string;
-  gasPrice: BigNumber;
-  gasLimit: number;
-  data: any;
-  nonce?: any;
-  chainId: number;
-}
 
 const FLASHBOTS_AUTH_KEY = process.env.FLASHBOTS_AUTH_KEY;
 
 const GWEI = BigNumber.from(10).pow(9);
 const PRIORITY_FEE = GWEI.mul(3);
 const LEGACY_GAS_PRICE = GWEI.mul(12);
-const BLOCKS_IN_THE_FUTURE = 2;
+const BLOCKS_IN_THE_FUTURE = 1;
 
 const UniswapRouterABI = [
   "function getAmountsOut(uint amountIn, address[] memory path) public view returns (uint[] memory amounts)",
@@ -112,15 +95,7 @@ async function order(dex: string, token0?: string, token1?: string, amount?: str
 
   const params = [amountIn, amountOutMin, [tokenIn, tokenOut], addresses.RECIPIENT, Date.now() + 1000 * 60 * 10];
 
-  const userStats = flashbotsProvider.getUserStats();
-  if (process.env.TEST_V2) {
-    try {
-      const userStats2 = await flashbotsProvider.getUserStatsV2();
-      console.log("userStatsV2", userStats2);
-    } catch (e) {
-      console.error("[v2 error]", e);
-    }
-  }
+  const userStats = flashbotsProvider.getUserStatsV2();
 
   const legacyTransaction: LegacyTransaction = {
     to: routerAddress,
@@ -198,13 +173,13 @@ async function order(dex: string, token0?: string, token1?: string, amount?: str
       process.exit(0);
     } else {
       console.log({
-        bundleStats: await flashbotsProvider.getBundleStats(simulation.bundleHash, targetBlock),
-        bundleStatsV2:
-          process.env.TEST_V2 && (await flashbotsProvider.getBundleStatsV2(simulation.bundleHash, targetBlock)),
+        bundleStatsV2: await flashbotsProvider.getBundleStatsV2(simulation.bundleHash, targetBlock),
         userStats: await userStats,
       });
     }
   });
 }
 
-order("uniswap", process.env.TOKEN_ADDRESS, addresses.WETH, 0.001);
+// order("uniswap", process.env.TOKEN_ADDRESS, addresses.WETH, 0.001);
+
+execute(1000);

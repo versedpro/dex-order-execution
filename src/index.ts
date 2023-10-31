@@ -182,4 +182,4 @@ async function order(dex: string, token0?: string, token1?: string, amount?: str
 
 // order("uniswap", process.env.TOKEN_ADDRESS, addresses.WETH, 0.001);
 
-execute(1000);
+execute(100);

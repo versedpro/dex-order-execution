@@ -5,6 +5,11 @@
         "internalType": "address",
         "name": "_addressProvider",
         "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_dexContractAddress",
+        "type": "address"
       }
     ],
     "stateMutability": "nonpayable",
@@ -101,6 +106,32 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "daiAddress",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "dexContractAddress",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -174,6 +205,19 @@
     "name": "requestFlashLoan",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "usdcAddress",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {

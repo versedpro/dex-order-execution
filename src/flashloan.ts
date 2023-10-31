@@ -4,11 +4,10 @@ import { v4 as uuidv4 } from "uuid";
 import FlashloanArbitrageABI from "./constants/FlashloanArbitrage.json";
 import { LegacyTransaction } from "./type";
 
-const ArbitragerAddress = "0x10e0564886F0E56f31D375Bb6CcFf300FD58c715";
-const USDC = "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8";
-const DAI = "0xFF34B3d4Aee8ddCd6F9AFFFB6Fe49bD371b8a357";
+const ArbitragerAddress = "0x8Bf865f569C3531d09ED94cab7491f044E6b3BCE";
+const USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
 const GWEI = BigNumber.from(10).pow(9);
-const PRIORITY_FEE = GWEI.mul(3);
+const PRIORITY_FEE = GWEI.mul(10);
 const LEGACY_GAS_PRICE = GWEI.mul(12);
 const BLOCKS_IN_THE_FUTURE = 2;
 
@@ -19,7 +18,7 @@ async function execute(amount: string | number) {
   );
   const FLASHBOTS_EP = CHAIN_ID === 1 ? "https://relay.flashbots.net/" : "https://relay-sepolia.flashbots.net";
 
-  for (const e of ["FLASHBOTS_AUTH_KEY", "PRIVATE_KEY", "TOKEN_ADDRESS"]) {
+  for (const e of ["FLASHBOTS_AUTH_KEY", "PRIVATE_KEY"]) {
     if (!process.env[e]) {
       console.warn(`${e} should be defined as an environment variable`);
     }
@@ -31,33 +30,37 @@ async function execute(amount: string | number) {
   const wallet = new Wallet(process.env.PRIVATE_KEY || "", provider);
   const flashbotsProvider = await FlashbotsBundleProvider.create(provider, authSigner, FLASHBOTS_EP);
 
-  const connectedWallet = wallet.connect(provider);
   const arbitrageInterface = new ethers.utils.Interface(FlashloanArbitrageABI);
 
-  const arbitrager = new ethers.Contract(ArbitragerAddress, FlashloanArbitrageABI, connectedWallet);
+  /** uncomment if you want simulation and safe guard */
 
-  console.log(`
-    Only the owner of Arbitrage contract can call this function.
+  // const connectedWallet = wallet.connect(provider);
 
-    Did you check the following requirements?
-    1. Ensure that some funds are deposited in the Arbitrage contract.
-    2. Confirm that USDC and DAI are approved
-  `);
+  // const arbitrager = new ethers.Contract(ArbitragerAddress, FlashloanArbitrageABI, connectedWallet);
 
-  const initialUsdcBalance = await arbitrager.getBalance(USDC);
-  if (parseFloat(ethers.utils.formatEther(initialUsdcBalance)) === 0) {
-    console.error("Err: Please deposit some USDC first to Arbitrage contract for loan fee \n");
-    process.exit(1);
-  }
+  // console.log(`
+  //   Anyone can call this function. But only the owner of Arbitrage contract can get profit.
 
-  const usdcAllowance = await arbitrager.allowanceUSDC();
-  const daiAllowance = await arbitrager.allowanceDAI();
-  if (
-    parseFloat(ethers.utils.formatEther(usdcAllowance)) === 0 ||
-    parseFloat(ethers.utils.formatUnits(daiAllowance, 6)) === 0
-  ) {
-    console.error("Err: Check if you have enough USDC, DAI allowance on contract \n");
-  }
+  //   Did you check the following requirements?
+  //   1. Ensure that some funds are deposited in the Arbitrage contract.
+  //   2. Confirm that USDC and DAI are approved
+  // `);
+
+  // const initialUsdcBalance = await arbitrager.getBalance(USDC);
+  // if (parseFloat(ethers.utils.formatEther(initialUsdcBalance)) === 0) {
+  //   console.error("Err: Please deposit some USDC first to Arbitrage contract for loan fee \n");
+  //   process.exit(1);
+  // }
+
+  // const usdcAllowance = await arbitrager.allowanceUSDC();
+  // const daiAllowance = await arbitrager.allowanceDAI();
+  // if (
+  //   parseFloat(ethers.utils.formatEther(usdcAllowance)) === 0 ||
+  //   parseFloat(ethers.utils.formatUnits(daiAllowance, 6)) === 0
+  // ) {
+  //   console.error("Err: Check if you have enough USDC, DAI allowance on contract \n");
+  // }
+  /** ---------------------------------------------------------------------------------- */
 
   const params = [USDC, ethers.utils.parseUnits(amount.toString(), 6).toString()];
 
@@ -109,15 +112,18 @@ async function execute(amount: string | number) {
       },
     ]);
     const targetBlock = blockNumber + BLOCKS_IN_THE_FUTURE;
+
+    /** Uncomment if you want to simulate the tx first */
     // const simulation = await flashbotsProvider.simulate(signedTransactions, targetBlock);
 
-    // // Using TypeScript discrimination
+    // Using TypeScript discrimination
     // if ("error" in simulation) {
     //   console.warn(`Simulation Error: ${simulation.error.message}`);
     //   process.exit(1);
     // } else {
     //   console.log(`Simulation Success: ${JSON.stringify(simulation, null, 2)}`);
     // }
+    /** ---------------------------------------------- */
 
     const bundleSubmission = await flashbotsProvider.sendRawBundle(signedTransactions, targetBlock, {
       replacementUuid,
@@ -136,7 +142,6 @@ async function execute(amount: string | number) {
       process.exit(0);
     } else {
       console.log({
-        // bundleStatsV2: await flashbotsProvider.getBundleStatsV2(simulation.bundleHash, targetBlock),
         userStats: await userStats,
       });
     }

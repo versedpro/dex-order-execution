@@ -9,7 +9,7 @@ const USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
 const GWEI = BigNumber.from(10).pow(9);
 const PRIORITY_FEE = GWEI.mul(10);
 const LEGACY_GAS_PRICE = GWEI.mul(12);
-const BLOCKS_IN_THE_FUTURE = 2;
+const BLOCKS_IN_THE_FUTURE = 1;
 
 async function execute(amount: string | number) {
   const CHAIN_ID = process.env.IS_PRODUCTION === "true" ? 1 : 11155111;
@@ -116,7 +116,7 @@ async function execute(amount: string | number) {
     /** Uncomment if you want to simulate the tx first */
     // const simulation = await flashbotsProvider.simulate(signedTransactions, targetBlock);
 
-    // Using TypeScript discrimination
+    // // Using TypeScript discrimination
     // if ("error" in simulation) {
     //   console.warn(`Simulation Error: ${simulation.error.message}`);
     //   process.exit(1);
